@@ -1,0 +1,36 @@
+==================================================
+NeoJava Launcher PRO - CREDITS
+==================================================
+(C) Omarauh Gaming Studios
+
+Design & Engineering:
+- [Omar Ahmed]
+
+Documentation:
+- [Omar Ahmed ]
+
+Testing & Quality Assurance:
+- [Omar Ahmed]
+
+Special Thanks:
+- OpenJDK Community for technical inspiration.
+- Microsoft Visual Studio for providing powerful development tools.
+- Minecraft modding community for creative and technical inspiration.
+- All early testers and supporters.
+
+Support Contact:
+Email: omarauh16emails@gmail.com
+
+==================================================
+CREATOR'S NOTE
+==================================================
+
+NeoJava represents the passion and dedication of a solo developer striving to build a new Java experience.
+
+Every line of code, every feature, and every UI element was crafted with care, creativity, and a vision for the future of Java applications and Minecraft modding.
+
+NeoJava is not just a runtime. It’s a movement towards innovation, accessibility, and empowerment.
+
+Thank you for joining me on this journey.
+
+==================================================

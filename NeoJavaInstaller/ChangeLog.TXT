@@ -1,0 +1,27 @@
+==================================================
+NeoJava Runtime - CHANGELOG
+==================================================
+
+Version 1.0 STS - Initial Release (2025)
+
+-------------------------------------------
+Major Features:
+✔ NeoJava Runtime created.
+✔ Added automatic detection of NeoJava JDK and JRE.
+✔ Launch button integrated with error handling.
+✔ Minimize to tray support added.
+✔ Supports both LTS and STS versions.
+✔ Custom error messages for missing files.
+✔ Professional License, ReadMe, Changelog, and Credits added.
+✔ Modern UI implemented.
+
+-------------------------------------------
+Future Plans:
+- Auto-update system.
+- Advanced theme customization.
+- Language support expansion.
+- Mod loader integration (planned for NeoJava Mod Loader 12.Feature).
+- Enhanced splash screens and loading animations.
+- Legacy runtime support for older systems.
+
+==================================================
