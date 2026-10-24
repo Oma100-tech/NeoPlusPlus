@@ -1,105 +1,47 @@
-# NeoJava
+# Neo++
 
-NeoJava has evolved from a simple Java starter into a custom competitive-programming runtime called NeoLang.
+Neo++ is a Windows competitive-coding desktop app. The GUI and installer are built with .NET/C#; submitted challenge solutions are compiled and run locally as C# programs. The earlier Java prototype remains in `src/` for reference and is not part of the Neo++ desktop app.
 
-This project is not just Java code in a folder; it includes a lightweight language runtime, a challenge system, and a judge-style workflow for coding problems.
+## Included features
 
-## What is included
+- Branded dark-mode coding workspace with an editable C# code pane and output console
+- Local compile-and-run workflow that judges actual output against each challenge's expected output
+- Six starter challenges across math, arrays, loops, and strings, with category and difficulty filters
+- Open/save `.cs` source files
+- Local player profiles, points, solved-challenge progress, and a local leaderboard
+- Branded Neo++ application icon
+- GUI installer with install-directory selection and optional desktop shortcut
+- Start-menu shortcut for Windows Search, App Paths registration, and an Apps & Features uninstall entry
+- GUI uninstaller that removes the app while keeping local profile data
 
-- NeoLang: a tiny custom programming language with variables, conditionals, loops, arrays, and function-like calls
-- Challenge manager: a small competitive-programming library with built-in problem definitions
-- CLI runner: supports listing, describing, running, and judging NeoScript files
-- Example challenge scripts in the `examples/` directory
+Profiles and scores are local to this Windows account. There is no online login or global leaderboard.
 
-## Project structure
+## Build
 
-- `src/main/java/com/neojava/neo/NeoLang.java` – main CLI entry point
-- `src/main/java/com/neojava/neo/NeoInterpreter.java` – custom language interpreter
-- `src/main/java/com/neojava/neo/NeoChallengeManager.java` – built-in challenge catalog
-- `examples/` – NeoScript example programs and challenge files
-
-## NeoScript language basics
-
-```neo
-let name = "Neo"
-let score = 42
-
-if score >= 40 {
-  print "Rank: Elite"
-} else {
-  print "Rank: Rookie"
-}
-
-loop i from 1 to 5 {
-  print i
-}
-```
-
-Supported concepts:
-
-- variable assignment with `let` and `=`
-- `if` / `else` blocks
-- Java-like `while (cond) { ... }` loops
-- Java-like `for (let i = 0; i < 10; i = i + 1) { ... }`
-- `switch (value) { case 1: ... default: ... }`
-- `break` and `continue`
-- `loop i from start to end { ... }`
-- `print` statements
-- arithmetic: `+ - * / %`
-- comparisons: `== != > >= < <=`
-- arrays: `[1, 2, 3]` and indexing like `values[0]`
-- property access: `values.length`
-
-```neo
-for (let i = 1; i <= 5; i = i + 1) {
-  print i
-}
-
-while (count < 3) {
-  count = count + 1
-  if (count == 2) {
-    continue
-  }
-  print count
-}
-
-switch (mode) {
-  case 1:
-    print "one"
-    break
-  default:
-    print "other"
-}
-```
-
-## Build and run
-
-Use any Java 21 JDK available on your machine.
+Requirements: Windows, .NET 8 SDK, and NuGet access for restoring the Windows runtime packs.
 
 ```powershell
-cd "C:\Users\OMAR AHMED\Documents\GitHub\NeoJava"
-set JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot
-set PATH=%JAVA_HOME%\bin;%PATH%
-
-mkdir out
-javac -d out (Get-ChildItem -Recurse -Path src\main\java -Filter *.java | Select-Object -ExpandProperty FullName)
-java -cp out com.neojava.neo.NeoLang --list
+cd "C:\path\to\NeoJava\NeoPlusPlus"
+dotnet build NeoPlusPlusApp\NeoPlusPlusApp.csproj -c Release
+dotnet build NeoPlusPlusSetup\NeoPlusPlusSetup.csproj -c Release
 ```
 
-## Example commands
+## Create the installer package
 
 ```powershell
-java -cp out com.neojava.neo.NeoLang --list
-java -cp out com.neojava.neo.NeoLang --describe neo-sum
-java -cp out com.neojava.neo.NeoLang --run examples\sum.neo
-java -cp out com.neojava.neo.NeoLang --judge neo-sum examples\sum.neo
+cd "C:\path\to\NeoJava\NeoPlusPlus"
+.\build-release.ps1
 ```
 
-## Sample challenge scripts
+The script creates a self-contained x64 package in `dist\`:
 
-- `examples/hello.neo`
-- `examples/sum.neo`
-- `examples/prime.neo`
-- `examples/fib.neo`
+- `NeoPlusPlusSetup.exe` — GUI installer wizard
+- `NeoPlusPlus.exe` — desktop application copied by the installer
 
-This project is intentionally a strong foundation for a richer competitive programming platform with more advanced challenge types, scoring, team modes, and a full online judge later on.
+Run `NeoPlusPlusSetup.exe`, choose an install directory and whether to create a desktop shortcut, then select **Install Neo++**. The installer registers the Start menu shortcut (which Windows Search can find) and an uninstall entry for the current Windows user; it does not require administrator access.
+
+## Run challenges
+
+Open the Arena tab, choose a category and difficulty, edit the C# solution, and press **Run & Judge**. The app compiles the solution using the locally installed .NET 8 SDK, runs it, and compares its output with the selected challenge's expected output. Compilation errors, runtime errors, and timeouts are shown in the output panel.
+
+**Code runs on your computer and is not sandboxed. Only run code you trust.** Execution is time-limited and output is capped, but those limits are not a security boundary. Install the .NET 8 SDK on the target computer to compile challenge solutions.

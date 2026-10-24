@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <AssemblyName>NeoPlusPlus</AssemblyName>
+    <RootNamespace>NeoPlusPlusApp</RootNamespace>
+    <ApplicationIcon>..\Assets\NeoPlusPlus.ico</ApplicationIcon>
+    <Product>Neo++</Product>
+    <Company>Neo++</Company>
+    <Version>1.0.0</Version>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>
