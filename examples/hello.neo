@@ -1,0 +1,10 @@
+let name = "Neo"
+let score = 42
+print "Hello, " + name + "!"
+print "Score: " + score
+
+if score >= 40 {
+  print "Rank: Elite"
+} else {
+  print "Rank: Rookie"
+}

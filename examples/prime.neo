@@ -1,0 +1,12 @@
+let n = 29
+let isPrime = true
+loop i from 2 to n - 1 {
+  if n % i == 0 {
+    isPrime = false
+  }
+}
+if isPrime {
+  print "prime"
+} else {
+  print "not prime"
+}

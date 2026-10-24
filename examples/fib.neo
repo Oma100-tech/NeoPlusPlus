@@ -1,0 +1,9 @@
+let a = 0
+let b = 1
+let n = 10
+loop i from 1 to n {
+  let temp = a + b
+  a = b
+  b = temp
+}
+print a

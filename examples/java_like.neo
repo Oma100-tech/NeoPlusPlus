@@ -1,0 +1,26 @@
+let total = 0
+for (let i = 1; i <= 5; i = i + 1) {
+  total = total + i
+}
+print total
+
+let x = 0
+while (x < 3) {
+  x = x + 1
+  if (x == 2) {
+    continue
+  }
+  print x
+}
+
+let mode = 2
+switch (mode) {
+  case 1:
+    print "one"
+    break
+  case 2:
+    print "two"
+    break
+  default:
+    print "other"
+}

@@ -1,0 +1,5 @@
+let total = 0
+loop i from 1 to 10 {
+  total = total + i
+}
+print total
