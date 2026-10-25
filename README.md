@@ -81,7 +81,7 @@ The IDE also has a Java Bridge tab for choosing and running a `.java` source fil
 
 ## Desktop IDE and runtime hub
 
-The IDE includes a Neo++ source editor, new/open/save controls, NVM bytecode disassembly, run and submit actions, challenge categories and difficulty filters, runtime/JDK status, the Java Bridge tab, local profiles, points and a local leaderboard. Challenge submissions are checked against expected output by the Neo++ VM.
+The IDE includes a Visual Studio-inspired menu and workspace, a Neo++ source editor, new/open/save controls, NVM bytecode disassembly, run and submit actions, challenge categories and difficulty filters, runtime/JDK status, the Java Bridge tab, local profiles, points and a local leaderboard. Its Developer Console supports `help`, `clear`, `version`, `run [file.neo]`, `build [file.neo]` and `disassemble [file.neo]`; file paths can be quoted, and omitted paths use the editor's current source.
 
 Profiles and scores are stored locally on the Windows account. There is no online login or global leaderboard.
 
@@ -110,7 +110,7 @@ The script publishes self-contained x64 executables into `dist\`:
 - `NeoPlusPlusCli.exe` — standalone Neo++ command-line runtime
 - `examples\` — sample Neo++ programs and the Java bridge demo
 
-The installer lets you choose an installation folder and optionally create a desktop shortcut. It creates a Start-menu shortcut (available through Windows Search), registers an Apps & Features uninstall entry for the current user, and installs the IDE, CLI and examples without requiring administrator rights.
+The installer uses a Visual Studio-inspired setup layout. The IDE is required; command-line tools and example programs are optional, and a desktop shortcut can be selected. During installation it reports the current component, copied bytes and percentage instead of showing an indefinite spinner. It creates a Start-menu shortcut (available through Windows Search), registers an Apps & Features uninstall entry for the current user, and installs without requiring administrator rights.
 
 ## Runtime safety
 

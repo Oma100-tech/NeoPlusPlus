@@ -11,6 +11,10 @@ public partial class Form1 : Form
     private readonly ComboBox _difficultyFilter = new();
     private readonly RichTextBox _editor = new();
     private readonly RichTextBox _output = new();
+    private readonly RichTextBox _developerConsoleOutput = new();
+    private readonly TextBox _developerConsoleInput = new();
+    private readonly List<string> _developerConsoleHistory = [];
+    private readonly TabControl _mainTabs = new();
     private readonly Label _status = new();
     private readonly Label _profileSummary = new();
     private readonly DataGridView _leaderboard = new();
@@ -20,6 +24,7 @@ public partial class Form1 : Form
     private readonly RichTextBox _javaOutput = new();
     private string? _currentFilePath;
     private string? _loadedChallengeId;
+    private int _developerConsoleHistoryIndex;
     private UserProfile _profile = new();
 
     public Form1()
@@ -40,15 +45,17 @@ public partial class Form1 : Form
         var root = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            RowCount = 3,
+            RowCount = 4,
             ColumnCount = 1,
-            Padding = new Padding(14),
+            Padding = new Padding(10),
             BackColor = Color.FromArgb(17, 19, 26)
         };
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
-        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
 
+        var menu = BuildMainMenu();
         var header = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(17, 19, 26) };
         var brand = new Label
         {
@@ -70,28 +77,81 @@ public partial class Form1 : Form
         header.Controls.Add(tagline);
         header.Controls.Add(brand);
 
-        var tabs = new TabControl { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 10F) };
+        _mainTabs.Dock = DockStyle.Fill;
+        _mainTabs.Font = new Font("Segoe UI", 10F);
         var arena = new TabPage("Arena") { BackColor = Color.FromArgb(24, 27, 36), ForeColor = Color.White };
         var hub = new TabPage("Runtime Hub") { BackColor = Color.FromArgb(24, 27, 36), ForeColor = Color.White };
         var java = new TabPage("Java Bridge") { BackColor = Color.FromArgb(24, 27, 36), ForeColor = Color.White };
         var profile = new TabPage("Profile") { BackColor = Color.FromArgb(24, 27, 36), ForeColor = Color.White };
         var leaderboard = new TabPage("Leaderboard") { BackColor = Color.FromArgb(24, 27, 36), ForeColor = Color.White };
+        var developerConsole = new TabPage("Developer Console") { BackColor = Color.FromArgb(24, 27, 36), ForeColor = Color.White };
         BuildArena(arena);
         BuildRuntimeHub(hub);
         BuildJavaBridge(java);
         BuildProfile(profile);
         BuildLeaderboard(leaderboard);
-        tabs.TabPages.AddRange([arena, hub, java, profile, leaderboard]);
+        BuildDeveloperConsole(developerConsole);
+        _mainTabs.TabPages.AddRange([arena, hub, java, developerConsole, profile, leaderboard]);
 
         _status.Text = "Ready";
         _status.Dock = DockStyle.Fill;
         _status.ForeColor = Color.FromArgb(145, 220, 166);
         _status.TextAlign = ContentAlignment.MiddleLeft;
 
-        root.Controls.Add(header, 0, 0);
-        root.Controls.Add(tabs, 0, 1);
-        root.Controls.Add(_status, 0, 2);
+        root.Controls.Add(menu, 0, 0);
+        root.Controls.Add(header, 0, 1);
+        root.Controls.Add(_mainTabs, 0, 2);
+        root.Controls.Add(_status, 0, 3);
         Controls.Add(root);
+    }
+
+    private MenuStrip BuildMainMenu()
+    {
+        var menu = new MenuStrip
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Color.FromArgb(30, 33, 43),
+            ForeColor = Color.FromArgb(225, 232, 246),
+            Font = new Font("Segoe UI", 9F),
+            Padding = new Padding(6, 2, 0, 2)
+        };
+        var file = new ToolStripMenuItem("&File");
+        file.DropDownItems.Add(MenuItem("&New", Keys.Control | Keys.N, (_, _) => NewFile()));
+        file.DropDownItems.Add(MenuItem("&Open...", Keys.Control | Keys.O, (_, _) => OpenCodeFile()));
+        file.DropDownItems.Add(MenuItem("&Save...", Keys.Control | Keys.S, (_, _) => SaveCodeFile()));
+        file.DropDownItems.Add(new ToolStripSeparator());
+        file.DropDownItems.Add(MenuItem("E&xit", Keys.None, (_, _) => Close()));
+
+        var run = new ToolStripMenuItem("&Run");
+        run.DropDownItems.Add(MenuItem("&Run Neo++", Keys.F5, async (_, _) => await RunNeoProgramAsync(submit: false)));
+        run.DropDownItems.Add(MenuItem("Inspect &NVM bytecode", Keys.None, (_, _) => InspectBytecode()));
+        run.DropDownItems.Add(MenuItem("Clear developer console", Keys.None, (_, _) => _developerConsoleOutput.Clear()));
+
+        var view = new ToolStripMenuItem("&View");
+        view.DropDownItems.Add(MenuItem("&Developer Console", Keys.Control | Keys.Alt | Keys.C, (_, _) => SelectTab("Developer Console")));
+
+        var help = new ToolStripMenuItem("&Help");
+        help.DropDownItems.Add(MenuItem("Neo++ &Runtime", Keys.None, (_, _) => SelectTab("Runtime Hub")));
+
+        menu.Items.AddRange([file, run, view, help]);
+        MainMenuStrip = menu;
+        return menu;
+    }
+
+    private static ToolStripMenuItem MenuItem(string text, Keys shortcut, EventHandler handler)
+    {
+        var item = new ToolStripMenuItem(text) { ShortcutKeys = shortcut };
+        item.Click += handler;
+        return item;
+    }
+
+    private void SelectTab(string title)
+    {
+        var page = _mainTabs.TabPages.Cast<TabPage>().FirstOrDefault(tab => tab.Text == title);
+        if (page is not null)
+        {
+            _mainTabs.SelectedTab = page;
+        }
     }
 
     private void BuildArena(TabPage page)
@@ -274,6 +334,199 @@ public partial class Form1 : Form
         _javaOutput.Text = "Choose a Java source file to run it with the installed JDK. Neo++ scripts can also call java(\"Example.java\").";
         layout.Controls.Add(_javaOutput, 0, 3);
         page.Controls.Add(layout);
+    }
+
+    private void BuildDeveloperConsole(TabPage page)
+    {
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            Padding = new Padding(16),
+            ColumnCount = 1,
+            RowCount = 3,
+            BackColor = Color.FromArgb(24, 27, 36)
+        };
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+
+        var toolbar = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight
+        };
+        toolbar.Controls.Add(Heading("Neo++ Developer Console"));
+        toolbar.Controls.Add(StyledButton("Help", (_, _) => AppendConsoleLine("Commands: help, clear, version, run [file.neo], build [file.neo], disassemble [file.neo]")));
+        toolbar.Controls.Add(StyledButton("Clear", (_, _) => _developerConsoleOutput.Clear()));
+        toolbar.Controls.Add(StyledButton("Run editor", async (_, _) => await RunConsoleSourceAsync(_editor.Text, _currentFilePath)));
+        layout.Controls.Add(toolbar, 0, 0);
+
+        _developerConsoleOutput.Dock = DockStyle.Fill;
+        _developerConsoleOutput.ReadOnly = true;
+        _developerConsoleOutput.BackColor = Color.FromArgb(12, 14, 19);
+        _developerConsoleOutput.ForeColor = Color.FromArgb(205, 215, 232);
+        _developerConsoleOutput.Font = new Font("Cascadia Code", 10F);
+        _developerConsoleOutput.BorderStyle = BorderStyle.FixedSingle;
+        _developerConsoleOutput.WordWrap = false;
+        _developerConsoleOutput.Text = "Neo++ Developer Console — commands run locally in the NVM." +
+            Environment.NewLine + "Type help to see available commands.";
+        layout.Controls.Add(_developerConsoleOutput, 0, 1);
+
+        var commandRow = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Padding = new Padding(0, 8, 0, 0) };
+        commandRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 86));
+        commandRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        var prompt = new Label
+        {
+            Text = "neo++ >",
+            Dock = DockStyle.Fill,
+            ForeColor = Color.FromArgb(116, 166, 255),
+            Font = new Font("Cascadia Code", 10F, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        _developerConsoleInput.Dock = DockStyle.Fill;
+        _developerConsoleInput.BackColor = Color.FromArgb(15, 17, 23);
+        _developerConsoleInput.ForeColor = Color.White;
+        _developerConsoleInput.Font = new Font("Cascadia Code", 10F);
+        _developerConsoleInput.BorderStyle = BorderStyle.FixedSingle;
+        _developerConsoleInput.KeyDown += DeveloperConsoleInput_KeyDown;
+        commandRow.Controls.Add(prompt, 0, 0);
+        commandRow.Controls.Add(_developerConsoleInput, 1, 0);
+        layout.Controls.Add(commandRow, 0, 2);
+        page.Controls.Add(layout);
+    }
+
+    private void DeveloperConsoleInput_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.KeyCode == Keys.Enter)
+        {
+            e.SuppressKeyPress = true;
+            string command = _developerConsoleInput.Text.Trim();
+            _developerConsoleInput.Clear();
+            if (command.Length > 0)
+            {
+                _developerConsoleHistory.Add(command);
+                _developerConsoleHistoryIndex = _developerConsoleHistory.Count;
+                _ = ExecuteDeveloperCommandAsync(command);
+            }
+        }
+        else if (e.KeyCode == Keys.Up && _developerConsoleHistory.Count > 0)
+        {
+            _developerConsoleHistoryIndex = Math.Max(0, _developerConsoleHistoryIndex - 1);
+            _developerConsoleInput.Text = _developerConsoleHistory[_developerConsoleHistoryIndex];
+            _developerConsoleInput.SelectionStart = _developerConsoleInput.TextLength;
+            e.SuppressKeyPress = true;
+        }
+        else if (e.KeyCode == Keys.Down && _developerConsoleHistory.Count > 0)
+        {
+            _developerConsoleHistoryIndex = Math.Min(_developerConsoleHistory.Count, _developerConsoleHistoryIndex + 1);
+            _developerConsoleInput.Text = _developerConsoleHistoryIndex == _developerConsoleHistory.Count
+                ? string.Empty
+                : _developerConsoleHistory[_developerConsoleHistoryIndex];
+            _developerConsoleInput.SelectionStart = _developerConsoleInput.TextLength;
+            e.SuppressKeyPress = true;
+        }
+    }
+
+    private async Task ExecuteDeveloperCommandAsync(string commandLine)
+    {
+        AppendConsoleLine($"neo++ > {commandLine}");
+        string command = commandLine.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries)[0].ToLowerInvariant();
+        string argument = commandLine.Length > command.Length ? commandLine[command.Length..].Trim().Trim('"') : string.Empty;
+        switch (command)
+        {
+            case "help":
+                AppendConsoleLine("Commands: help, clear, version, run [file.neo], build [file.neo], disassemble [file.neo]");
+                break;
+            case "clear":
+                _developerConsoleOutput.Clear();
+                break;
+            case "version":
+                AppendConsoleLine($"Neo++ {NeoRuntime.Version} | NVM bytecode runtime");
+                break;
+            case "run":
+                await RunConsoleFileAsync(argument);
+                break;
+            case "build":
+            case "disassemble":
+                await BuildConsoleFileAsync(command, argument);
+                break;
+            default:
+                AppendConsoleLine($"Unknown command: {command}. Type help for available commands.");
+                break;
+        }
+    }
+
+    private async Task RunConsoleFileAsync(string argument)
+    {
+        if (argument.Length == 0)
+        {
+            await RunConsoleSourceAsync(_editor.Text, _currentFilePath);
+            return;
+        }
+
+        try
+        {
+            string sourcePath = ResolveConsolePath(argument);
+            string source = await File.ReadAllTextAsync(sourcePath);
+            await RunConsoleSourceAsync(source, sourcePath);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            AppendConsoleLine(exception.Message);
+        }
+    }
+
+    private async Task RunConsoleSourceAsync(string source, string? sourcePath)
+    {
+        try
+        {
+            var result = await Task.Run(() => new NeoRuntime().Run(source, sourcePath));
+            AppendConsoleLine(result.Output.TrimEnd());
+            AppendConsoleLine($"Completed in {result.Elapsed.TotalMilliseconds:F1} ms.");
+            _status.Text = $"NVM finished in {result.Elapsed.TotalMilliseconds:F1} ms";
+        }
+        catch (Exception exception) when (exception is NeoLanguageException or InvalidOperationException or System.ComponentModel.Win32Exception or IOException)
+        {
+            AppendConsoleLine(exception.Message);
+            _status.Text = "Neo++ compile/runtime error";
+        }
+    }
+
+    private async Task BuildConsoleFileAsync(string command, string argument)
+    {
+        try
+        {
+            string? sourcePath = argument.Length == 0 ? _currentFilePath : ResolveConsolePath(argument);
+            string source = sourcePath is null ? _editor.Text : await File.ReadAllTextAsync(sourcePath);
+            string bytecode = await Task.Run(() => new NeoRuntime().Disassemble(source));
+            AppendConsoleLine(command == "build" ? "Compilation succeeded. NVM bytecode:" : "NVM bytecode:");
+            AppendConsoleLine(bytecode.TrimEnd());
+            _status.Text = "Neo++ source compiled to NVM bytecode";
+        }
+        catch (Exception exception) when (exception is NeoLanguageException or IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            AppendConsoleLine(exception.Message);
+            _status.Text = "Neo++ compile error";
+        }
+    }
+
+    private string ResolveConsolePath(string path)
+    {
+        string baseDirectory = _currentFilePath is null
+            ? Environment.CurrentDirectory
+            : Path.GetDirectoryName(_currentFilePath)!;
+        return Path.GetFullPath(path, baseDirectory);
+    }
+
+    private void AppendConsoleLine(string text)
+    {
+        if (text.Length > 0)
+        {
+            _developerConsoleOutput.AppendText(text + Environment.NewLine);
+        }
+        _developerConsoleOutput.SelectionStart = _developerConsoleOutput.TextLength;
+        _developerConsoleOutput.ScrollToCaret();
     }
 
     private void BuildProfile(TabPage page)

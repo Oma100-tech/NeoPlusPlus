@@ -3,6 +3,11 @@ using Microsoft.Win32;
 
 namespace NeoPlusPlusSetup;
 
+internal sealed record InstallerProgress(long CompletedBytes, long TotalBytes, string Message)
+{
+    public int Percentage => TotalBytes == 0 ? 100 : (int)Math.Clamp(CompletedBytes * 100 / TotalBytes, 0, 100);
+}
+
 internal static class Installer
 {
     private const string ProductKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\NeoPlusPlus";
@@ -11,7 +16,13 @@ internal static class Installer
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool MoveFileEx(string existingFileName, string? newFileName, int flags);
 
-    public static string Install(string sourceDirectory, string destinationDirectory, bool createDesktopShortcut)
+    public static string Install(
+        string sourceDirectory,
+        string destinationDirectory,
+        bool createDesktopShortcut,
+        bool installCli,
+        bool installExamples,
+        IProgress<InstallerProgress>? progress = null)
     {
         var appSource = Path.Combine(sourceDirectory, "NeoPlusPlus.exe");
         if (!File.Exists(appSource))
@@ -20,30 +31,66 @@ internal static class Installer
         }
 
         var cliSource = Path.Combine(sourceDirectory, "NeoPlusPlusCli.exe");
-        if (!File.Exists(cliSource))
+        if (installCli && !File.Exists(cliSource))
         {
             throw new FileNotFoundException("The Neo++ command-line runtime was not found next to the installer.", cliSource);
         }
 
         var examplesSource = Path.Combine(sourceDirectory, "examples");
-        if (!Directory.Exists(examplesSource))
+        if (installExamples && !Directory.Exists(examplesSource))
         {
             throw new DirectoryNotFoundException("The Neo++ language examples were not found next to the installer.");
         }
 
+        var setupSource = Environment.ProcessPath;
+        var setupTarget = Path.Combine(destinationDirectory, "NeoPlusPlusSetup.exe");
+        bool copySetup = !string.IsNullOrWhiteSpace(setupSource) &&
+            File.Exists(setupSource) &&
+            !Path.GetFullPath(setupSource).Equals(Path.GetFullPath(setupTarget), StringComparison.OrdinalIgnoreCase);
+        long totalBytes = new FileInfo(appSource).Length;
+        if (installCli)
+        {
+            totalBytes += new FileInfo(cliSource).Length;
+        }
+        if (installExamples)
+        {
+            totalBytes += Directory.EnumerateFiles(examplesSource, "*", SearchOption.AllDirectories).Sum(file => new FileInfo(file).Length);
+        }
+        if (copySetup)
+        {
+            totalBytes += new FileInfo(setupSource!).Length;
+        }
+
         Directory.CreateDirectory(destinationDirectory);
         var appTarget = Path.Combine(destinationDirectory, "NeoPlusPlus.exe");
-        File.Copy(appSource, appTarget, overwrite: true);
-        File.Copy(cliSource, Path.Combine(destinationDirectory, "NeoPlusPlusCli.exe"), overwrite: true);
-        CopyDirectory(examplesSource, Path.Combine(destinationDirectory, "examples"));
+        long completedBytes = 0;
+        CopyFile(appSource, appTarget, "Neo++ IDE", totalBytes, ref completedBytes, progress);
 
-        var setupSource = Environment.ProcessPath;
-        if (!string.IsNullOrWhiteSpace(setupSource) &&
-            File.Exists(setupSource) &&
-            !Path.GetFullPath(setupSource).Equals(Path.GetFullPath(Path.Combine(destinationDirectory, "NeoPlusPlusSetup.exe")), StringComparison.OrdinalIgnoreCase))
+        var cliTarget = Path.Combine(destinationDirectory, "NeoPlusPlusCli.exe");
+        if (installCli)
         {
-            File.Copy(setupSource, Path.Combine(destinationDirectory, "NeoPlusPlusSetup.exe"), overwrite: true);
+            CopyFile(cliSource, cliTarget, "Neo++ command-line tools", totalBytes, ref completedBytes, progress);
         }
+        else if (File.Exists(cliTarget))
+        {
+            File.Delete(cliTarget);
+        }
+
+        var examplesTarget = Path.Combine(destinationDirectory, "examples");
+        if (installExamples)
+        {
+            CopyDirectory(examplesSource, examplesTarget, totalBytes, ref completedBytes, progress);
+        }
+        else if (Directory.Exists(examplesTarget))
+        {
+            Directory.Delete(examplesTarget, recursive: true);
+        }
+
+        if (copySetup)
+        {
+            CopyFile(setupSource!, setupTarget, "Neo++ uninstaller", totalBytes, ref completedBytes, progress);
+        }
+        progress?.Report(new InstallerProgress(totalBytes, totalBytes, "Registering Neo++ with Windows…"));
 
         var startMenu = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.StartMenu),
@@ -79,16 +126,59 @@ internal static class Installer
         return appTarget;
     }
 
-    private static void CopyDirectory(string sourceDirectory, string targetDirectory)
+    private static void CopyDirectory(
+        string sourceDirectory,
+        string targetDirectory,
+        long totalBytes,
+        ref long completedBytes,
+        IProgress<InstallerProgress>? progress)
     {
         Directory.CreateDirectory(targetDirectory);
-        foreach (var file in Directory.GetFiles(sourceDirectory))
+        foreach (var file in Directory.EnumerateFiles(sourceDirectory))
         {
-            File.Copy(file, Path.Combine(targetDirectory, Path.GetFileName(file)), overwrite: true);
+            CopyFile(
+                file,
+                Path.Combine(targetDirectory, Path.GetFileName(file)),
+                "Examples: " + Path.GetFileName(file),
+                totalBytes,
+                ref completedBytes,
+                progress);
         }
-        foreach (var directory in Directory.GetDirectories(sourceDirectory))
+        foreach (var directory in Directory.EnumerateDirectories(sourceDirectory))
         {
-            CopyDirectory(directory, Path.Combine(targetDirectory, Path.GetFileName(directory)));
+            CopyDirectory(
+                directory,
+                Path.Combine(targetDirectory, Path.GetFileName(directory)),
+                totalBytes,
+                ref completedBytes,
+                progress);
+        }
+    }
+
+    private static void CopyFile(
+        string sourcePath,
+        string targetPath,
+        string description,
+        long totalBytes,
+        ref long completedBytes,
+        IProgress<InstallerProgress>? progress)
+    {
+        if (Path.GetFullPath(sourcePath).Equals(Path.GetFullPath(targetPath), StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
+        progress?.Report(new InstallerProgress(completedBytes, totalBytes, $"Copying {description}…"));
+        using var source = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, 1024 * 1024, FileOptions.SequentialScan);
+        using var target = new FileStream(targetPath, FileMode.Create, FileAccess.Write, FileShare.None, 1024 * 1024, FileOptions.SequentialScan);
+        var buffer = new byte[1024 * 1024];
+        int bytesRead;
+        while ((bytesRead = source.Read(buffer, 0, buffer.Length)) > 0)
+        {
+            target.Write(buffer, 0, bytesRead);
+            completedBytes += bytesRead;
+            progress?.Report(new InstallerProgress(completedBytes, totalBytes, $"Copying {description}…"));
         }
     }
 
