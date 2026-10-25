@@ -19,9 +19,23 @@ internal static class Installer
             throw new FileNotFoundException("The Neo++ application was not found next to the installer.", appSource);
         }
 
+        var cliSource = Path.Combine(sourceDirectory, "NeoPlusPlusCli.exe");
+        if (!File.Exists(cliSource))
+        {
+            throw new FileNotFoundException("The Neo++ command-line runtime was not found next to the installer.", cliSource);
+        }
+
+        var examplesSource = Path.Combine(sourceDirectory, "examples");
+        if (!Directory.Exists(examplesSource))
+        {
+            throw new DirectoryNotFoundException("The Neo++ language examples were not found next to the installer.");
+        }
+
         Directory.CreateDirectory(destinationDirectory);
         var appTarget = Path.Combine(destinationDirectory, "NeoPlusPlus.exe");
         File.Copy(appSource, appTarget, overwrite: true);
+        File.Copy(cliSource, Path.Combine(destinationDirectory, "NeoPlusPlusCli.exe"), overwrite: true);
+        CopyDirectory(examplesSource, Path.Combine(destinationDirectory, "examples"));
 
         var setupSource = Environment.ProcessPath;
         if (!string.IsNullOrWhiteSpace(setupSource) &&
@@ -63,6 +77,19 @@ internal static class Installer
         }
 
         return appTarget;
+    }
+
+    private static void CopyDirectory(string sourceDirectory, string targetDirectory)
+    {
+        Directory.CreateDirectory(targetDirectory);
+        foreach (var file in Directory.GetFiles(sourceDirectory))
+        {
+            File.Copy(file, Path.Combine(targetDirectory, Path.GetFileName(file)), overwrite: true);
+        }
+        foreach (var directory in Directory.GetDirectories(sourceDirectory))
+        {
+            CopyDirectory(directory, Path.Combine(targetDirectory, Path.GetFileName(directory)));
+        }
     }
 
     public static void Uninstall()
@@ -120,11 +147,27 @@ internal static class Installer
             File.Delete(appPath);
         }
 
+        var cliPath = Path.Combine(installDirectory, "NeoPlusPlusCli.exe");
+        if (File.Exists(cliPath))
+        {
+            File.Delete(cliPath);
+        }
+
+        var examplesPath = Path.Combine(installDirectory, "examples");
+        if (Directory.Exists(examplesPath))
+        {
+            Directory.Delete(examplesPath, recursive: true);
+        }
+
         var setupPath = Path.Combine(installDirectory, "NeoPlusPlusSetup.exe");
         bool setupScheduledForRemoval = true;
         if (File.Exists(setupPath))
         {
             setupScheduledForRemoval = MoveFileEx(setupPath, null, MoveFileDelayUntilReboot);
+        }
+        if (setupScheduledForRemoval)
+        {
+            MoveFileEx(installDirectory, null, MoveFileDelayUntilReboot);
         }
 
         using (var appPaths = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\App Paths", writable: true))

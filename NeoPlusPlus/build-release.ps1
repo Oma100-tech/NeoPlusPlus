@@ -1,22 +1,29 @@
 $ErrorActionPreference = "Stop"
 $projectRoot = $PSScriptRoot
 $appProject = Join-Path $projectRoot "NeoPlusPlusApp\NeoPlusPlusApp.csproj"
+$cliProject = Join-Path $projectRoot "NeoPlusPlusCli\NeoPlusPlusCli.csproj"
 $setupProject = Join-Path $projectRoot "NeoPlusPlusSetup\NeoPlusPlusSetup.csproj"
 $distribution = Join-Path $projectRoot "dist"
 $staging = Join-Path $env:TEMP ("NeoPlusPlus-build-" + [guid]::NewGuid().ToString("N"))
 $appPublish = Join-Path $staging "app"
+$cliPublish = Join-Path $staging "cli"
 $setupPublish = Join-Path $staging "setup"
 
 try {
     dotnet publish $appProject -c Release -r win-x64 -o $appPublish --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true
     if ($LASTEXITCODE -ne 0) { throw "Neo++ app publish failed." }
 
+    dotnet publish $cliProject -c Release -r win-x64 -o $cliPublish --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true
+    if ($LASTEXITCODE -ne 0) { throw "Neo++ CLI publish failed." }
+
     dotnet publish $setupProject -c Release -r win-x64 -o $setupPublish --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true
     if ($LASTEXITCODE -ne 0) { throw "Neo++ setup publish failed." }
 
     New-Item -ItemType Directory -Force -Path $distribution | Out-Null
     Copy-Item (Join-Path $appPublish "NeoPlusPlus.exe") (Join-Path $distribution "NeoPlusPlus.exe") -Force
+    Copy-Item (Join-Path $cliPublish "NeoPlusPlusCli.exe") (Join-Path $distribution "NeoPlusPlusCli.exe") -Force
     Copy-Item (Join-Path $setupPublish "NeoPlusPlusSetup.exe") (Join-Path $distribution "NeoPlusPlusSetup.exe") -Force
+    Copy-Item (Join-Path $projectRoot "examples") (Join-Path $distribution "examples") -Recurse -Force
     Write-Host "Neo++ installer package created in $distribution"
 }
 finally {

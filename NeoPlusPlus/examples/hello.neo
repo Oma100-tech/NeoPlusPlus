@@ -1,0 +1,9 @@
+const greeting = "Hello from Neo++";
+let score = 42;
+
+print greeting;
+if (score >= 40) {
+    print "Rank: Elite";
+} else {
+    print "Rank: Rookie";
+}

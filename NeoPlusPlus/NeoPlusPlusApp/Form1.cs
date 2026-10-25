@@ -1,3 +1,5 @@
+using NeoPlusPlus.Runtime;
+
 namespace NeoPlusPlusApp;
 
 public partial class Form1 : Form
@@ -13,6 +15,11 @@ public partial class Form1 : Form
     private readonly Label _profileSummary = new();
     private readonly DataGridView _leaderboard = new();
     private readonly Button _runButton = new();
+    private readonly Label _runtimeSummary = new();
+    private readonly TextBox _javaSourcePath = new();
+    private readonly RichTextBox _javaOutput = new();
+    private string? _currentFilePath;
+    private string? _loadedChallengeId;
     private UserProfile _profile = new();
 
     public Form1()
@@ -65,12 +72,16 @@ public partial class Form1 : Form
 
         var tabs = new TabControl { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 10F) };
         var arena = new TabPage("Arena") { BackColor = Color.FromArgb(24, 27, 36), ForeColor = Color.White };
+        var hub = new TabPage("Runtime Hub") { BackColor = Color.FromArgb(24, 27, 36), ForeColor = Color.White };
+        var java = new TabPage("Java Bridge") { BackColor = Color.FromArgb(24, 27, 36), ForeColor = Color.White };
         var profile = new TabPage("Profile") { BackColor = Color.FromArgb(24, 27, 36), ForeColor = Color.White };
         var leaderboard = new TabPage("Leaderboard") { BackColor = Color.FromArgb(24, 27, 36), ForeColor = Color.White };
         BuildArena(arena);
+        BuildRuntimeHub(hub);
+        BuildJavaBridge(java);
         BuildProfile(profile);
         BuildLeaderboard(leaderboard);
-        tabs.TabPages.AddRange([arena, profile, leaderboard]);
+        tabs.TabPages.AddRange([arena, hub, java, profile, leaderboard]);
 
         _status.Text = "Ready";
         _status.Dock = DockStyle.Fill;
@@ -149,19 +160,22 @@ public partial class Form1 : Form
             WrapContents = false,
             FlowDirection = FlowDirection.LeftToRight
         };
-        toolbar.Controls.Add(Heading("C# Editor"));
+        toolbar.Controls.Add(Heading("Neo++ Source"));
+        toolbar.Controls.Add(StyledButton("New", (_, _) => NewFile()));
         toolbar.Controls.Add(StyledButton("Open", (_, _) => OpenCodeFile()));
         toolbar.Controls.Add(StyledButton("Save", (_, _) => SaveCodeFile()));
-        _runButton.Text = "Run & Judge";
+        toolbar.Controls.Add(StyledButton("NVM bytecode", (_, _) => InspectBytecode()));
+        _runButton.Text = "Run Neo++";
         StyleButton(_runButton, Color.FromArgb(69, 130, 246));
-        _runButton.Click += async (_, _) => await RunChallengeAsync();
+        _runButton.Click += async (_, _) => await RunNeoProgramAsync(submit: false);
         toolbar.Controls.Add(_runButton);
+        toolbar.Controls.Add(StyledButton("Submit solution", async (_, _) => await RunNeoProgramAsync(submit: true)));
         editorPanel.Controls.Add(toolbar, 0, 0);
 
         _editor.Dock = DockStyle.Fill;
         _editor.BackColor = Color.FromArgb(15, 17, 23);
         _editor.ForeColor = Color.FromArgb(225, 232, 246);
-        _editor.Font = new Font("Consolas", 11F);
+        _editor.Font = new Font("Cascadia Code", 11F);
         _editor.BorderStyle = BorderStyle.FixedSingle;
         _editor.AcceptsTab = true;
         _editor.WordWrap = false;
@@ -184,7 +198,7 @@ public partial class Form1 : Form
         _output.ReadOnly = true;
         _output.BackColor = Color.FromArgb(12, 14, 19);
         _output.ForeColor = Color.FromArgb(180, 210, 190);
-        _output.Font = new Font("Consolas", 10F);
+        _output.Font = new Font("Cascadia Code", 10F);
         _output.BorderStyle = BorderStyle.FixedSingle;
         _output.ScrollBars = RichTextBoxScrollBars.Both;
         outputPanel.Controls.Add(_output, 0, 1);
@@ -195,6 +209,71 @@ public partial class Form1 : Form
         _categoryFilter.SelectedIndex = 0;
         _difficultyFilter.Items.AddRange(["All difficulties", "Easy", "Medium", "Hard"]);
         _difficultyFilter.SelectedIndex = 0;
+    }
+
+    private void BuildRuntimeHub(TabPage page)
+    {
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            Padding = new Padding(28),
+            ColumnCount = 1,
+            RowCount = 3,
+            BackColor = Color.FromArgb(24, 27, 36)
+        };
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 46));
+        layout.Controls.Add(Heading("Neo++ Hub Runtime"), 0, 0);
+
+        _runtimeSummary.Dock = DockStyle.Fill;
+        _runtimeSummary.AutoSize = false;
+        _runtimeSummary.Font = new Font("Cascadia Code", 11F);
+        _runtimeSummary.ForeColor = Color.FromArgb(221, 228, 242);
+        _runtimeSummary.Padding = new Padding(18);
+        _runtimeSummary.BackColor = Color.FromArgb(15, 17, 23);
+        _runtimeSummary.Text = "Loading runtime information…";
+        layout.Controls.Add(_runtimeSummary, 0, 1);
+        layout.Controls.Add(StyledButton("Refresh runtime status", (_, _) => RefreshRuntimeSummary()), 0, 2);
+        page.Controls.Add(layout);
+        RefreshRuntimeSummary();
+    }
+
+    private void BuildJavaBridge(TabPage page)
+    {
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            Padding = new Padding(26),
+            ColumnCount = 1,
+            RowCount = 4,
+            BackColor = Color.FromArgb(24, 27, 36)
+        };
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.Controls.Add(Heading("NeoJava Interoperability"), 0, 0);
+
+        var filePicker = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false };
+        _javaSourcePath.Width = 540;
+        _javaSourcePath.ReadOnly = true;
+        _javaSourcePath.BackColor = Color.FromArgb(15, 17, 23);
+        _javaSourcePath.ForeColor = Color.White;
+        filePicker.Controls.Add(_javaSourcePath);
+        filePicker.Controls.Add(StyledButton("Choose .java file", (_, _) => ChooseJavaFile()));
+        layout.Controls.Add(filePicker, 0, 1);
+        layout.Controls.Add(StyledButton("Compile & run with local JDK", async (_, _) => await RunJavaFileAsync()), 0, 2);
+
+        _javaOutput.Dock = DockStyle.Fill;
+        _javaOutput.ReadOnly = true;
+        _javaOutput.BackColor = Color.FromArgb(12, 14, 19);
+        _javaOutput.ForeColor = Color.FromArgb(190, 213, 195);
+        _javaOutput.Font = new Font("Cascadia Code", 10F);
+        _javaOutput.BorderStyle = BorderStyle.FixedSingle;
+        _javaOutput.Text = "Choose a Java source file to run it with the installed JDK. Neo++ scripts can also call java(\"Example.java\").";
+        layout.Controls.Add(_javaOutput, 0, 3);
+        page.Controls.Add(layout);
     }
 
     private void BuildProfile(TabPage page)
@@ -270,12 +349,11 @@ public partial class Form1 : Form
                 Id = "sum-one-to-ten", Title = "Sum 1..10", Category = "Math", Difficulty = "Easy",
                 Description = "Print the sum of every integer from 1 through 10.",
                 StarterCode = """
-                    int total = 0;
-                    for (int i = 1; i <= 10; i++)
-                    {
+                    let total = 0;
+                    loop i from 1 to 10 {
                         total += i;
                     }
-                    Console.WriteLine(total);
+                    print total;
                     """,
                 ExpectedOutput = "55"
             },
@@ -284,13 +362,14 @@ public partial class Form1 : Form
                 Id = "max-array", Title = "Find the maximum", Category = "Arrays", Difficulty = "Easy",
                 Description = "Find and print the largest number in the given array.",
                 StarterCode = """
-                    int[] values = { 4, 9, 2, 17, 5 };
-                    int max = values[0];
-                    for (int i = 1; i < values.Length; i++)
-                    {
-                        if (values[i] > max) max = values[i];
+                    let values = [4, 9, 2, 17, 5];
+                    let max = values[0];
+                    for (let i = 1; i < values.length; i++) {
+                        if (values[i] > max) {
+                            max = values[i];
+                        }
                     }
-                    Console.WriteLine(max);
+                    print max;
                     """,
                 ExpectedOutput = "17"
             },
@@ -299,13 +378,18 @@ public partial class Form1 : Form
                 Id = "prime-check", Title = "Prime check", Category = "Math", Difficulty = "Medium",
                 Description = "Print whether 29 is prime.",
                 StarterCode = """
-                    int n = 29;
-                    bool isPrime = true;
-                    for (int i = 2; i * i <= n; i++)
-                    {
-                        if (n % i == 0) isPrime = false;
+                    let n = 29;
+                    let isPrime = true;
+                    for (let i = 2; i * i <= n; i++) {
+                        if (n % i == 0) {
+                            isPrime = false;
+                        }
                     }
-                    Console.WriteLine(isPrime ? "prime" : "not prime");
+                    if (isPrime) {
+                        print "prime";
+                    } else {
+                        print "not prime";
+                    }
                     """,
                 ExpectedOutput = "prime"
             },
@@ -314,12 +398,16 @@ public partial class Form1 : Form
                 Id = "fizz-buzz", Title = "FizzBuzz", Category = "Loops", Difficulty = "Medium",
                 Description = "Print FizzBuzz for numbers 1 through 15, one per line.",
                 StarterCode = """
-                    for (int i = 1; i <= 15; i++)
-                    {
-                        if (i % 15 == 0) Console.WriteLine("FizzBuzz");
-                        else if (i % 3 == 0) Console.WriteLine("Fizz");
-                        else if (i % 5 == 0) Console.WriteLine("Buzz");
-                        else Console.WriteLine(i);
+                    for (let i = 1; i <= 15; i++) {
+                        if (i % 15 == 0) {
+                            print "FizzBuzz";
+                        } else if (i % 3 == 0) {
+                            print "Fizz";
+                        } else if (i % 5 == 0) {
+                            print "Buzz";
+                        } else {
+                            print i;
+                        }
                     }
                     """,
                 ExpectedOutput = """
@@ -345,10 +433,12 @@ public partial class Form1 : Form
                 Id = "reverse-string", Title = "Reverse a string", Category = "Strings", Difficulty = "Easy",
                 Description = "Print the input word backwards.",
                 StarterCode = """
-                    string word = "neoplus";
-                    char[] chars = word.ToCharArray();
-                    Array.Reverse(chars);
-                    Console.WriteLine(new string(chars));
+                    let word = "neoplus";
+                    let reversed = "";
+                    loop i from 0 to word.length - 1 {
+                        reversed = word[i] + reversed;
+                    }
+                    print reversed;
                     """,
                 ExpectedOutput = "sulpoen"
             },
@@ -357,21 +447,22 @@ public partial class Form1 : Form
                 Id = "longest-unique-substring", Title = "Longest unique substring", Category = "Strings", Difficulty = "Hard",
                 Description = "Find the length of the longest substring without repeated characters.",
                 StarterCode = """
-                    string text = "abcabcbb";
-                    int start = 0;
-                    int longest = 0;
-                    Dictionary<char, int> lastSeen = new();
-                    for (int i = 0; i < text.Length; i++)
-                    {
-                        char current = text[i];
-                        if (lastSeen.TryGetValue(current, out int previous) && previous >= start)
-                        {
-                            start = previous + 1;
+                    let text = "abcabcbb";
+                    let longest = 0;
+                    for (let start = 0; start < text.length; start++) {
+                        let seen = "";
+                        for (let end = start; end < text.length; end++) {
+                            let character = text[end];
+                            if (contains(seen, character)) {
+                                break;
+                            }
+                            seen += character;
+                            if (seen.length > longest) {
+                                longest = seen.length;
+                            }
                         }
-                        lastSeen[current] = i;
-                        longest = Math.Max(longest, i - start + 1);
                     }
-                    Console.WriteLine(longest);
+                    print longest;
                     """,
                 ExpectedOutput = "3"
             }
@@ -413,58 +504,57 @@ public partial class Form1 : Form
         }
 
         _editor.Text = challenge.StarterCode;
+        _currentFilePath = null;
+        _loadedChallengeId = challenge.Id;
         _output.Text = $"{challenge.Title} | {challenge.Category} | {challenge.Difficulty}{Environment.NewLine}{challenge.Description}{Environment.NewLine}Expected output:{Environment.NewLine}{challenge.ExpectedOutput}";
         _status.Text = $"Loaded {challenge.Title}";
     }
 
-    private async Task RunChallengeAsync()
+    private async Task RunNeoProgramAsync(bool submit)
     {
-        if (_challengeList.SelectedItem is not Challenge challenge)
+        Challenge? challenge = _loadedChallengeId is null
+            ? null
+            : _challenges.FirstOrDefault(item => item.Id == _loadedChallengeId);
+        if (submit && challenge is null)
         {
-            _output.Text = "Select a challenge first.";
+            _output.Text = "Select a challenge before submitting a solution.";
             return;
         }
 
         _runButton.Enabled = false;
-        _status.Text = "Compiling and running C#…";
-        _output.Text = "Running locally. Only run code you trust.";
+        _status.Text = "Compiling Neo++ bytecode on NVM…";
+        _output.Text = "Running Neo++ on the local NVM.";
 
         try
         {
-            var result = await CSharpRunner.RunAsync(_editor.Text, TimeSpan.FromSeconds(5));
-            var actual = NormalizeOutput(result.StandardOutput);
-            var expected = NormalizeOutput(challenge.ExpectedOutput);
-            bool passed = result.ExitCode == 0 && !result.TimedOut && actual == expected;
-
-            _output.Text = result.StandardOutput;
-            if (!string.IsNullOrWhiteSpace(result.StandardError))
+            string source = _editor.Text;
+            string? sourcePath = _currentFilePath;
+            var result = await Task.Run(() => new NeoRuntime().Run(source, sourcePath));
+            _output.Text = result.Output;
+            if (submit && challenge is not null)
             {
-                _output.AppendText(Environment.NewLine + result.StandardError);
+                var expected = NormalizeOutput(challenge.ExpectedOutput);
+                var actual = NormalizeOutput(result.Output);
+                if (actual == expected)
+                {
+                    _output.AppendText($"{Environment.NewLine}PASS — output matched. Awarded {PointsFor(challenge)} points.");
+                    _status.Text = $"Passed in {result.Elapsed.TotalMilliseconds:F1} ms";
+                    _profileStore.RecordSolved(_profile, challenge);
+                    _profile = _profileStore.Load();
+                    RefreshProfileViews();
+                }
+                else
+                {
+                    _output.AppendText($"{Environment.NewLine}FAIL — expected:{Environment.NewLine}{expected}");
+                    _status.Text = "Output did not match challenge";
+                }
             }
-
-            if (result.TimedOut)
-            {
-                _output.AppendText(Environment.NewLine + "Execution timed out after 5 seconds. The process was stopped.");
-                _status.Text = "Timed out";
-            }
-            else if (passed)
-            {
-                _output.AppendText(Environment.NewLine + Environment.NewLine + "PASS — output matches the challenge.");
-                _status.Text = "Challenge passed";
-                _profileStore.RecordSolved(_profile, challenge);
-                _profile = _profileStore.Load();
-                RefreshProfileViews();
-            }
-            else
-            {
-                _output.AppendText($"{Environment.NewLine}{Environment.NewLine}FAIL — expected:{Environment.NewLine}{expected}{Environment.NewLine}Exit code: {result.ExitCode}");
-                _status.Text = result.ExitCode == 0 ? "Output did not match" : "Compilation or runtime error";
-            }
+            else _status.Text = $"NVM finished in {result.Elapsed.TotalMilliseconds:F1} ms";
         }
-        catch (Exception exception) when (exception is IOException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        catch (Exception exception) when (exception is NeoLanguageException or InvalidOperationException or System.ComponentModel.Win32Exception or IOException)
         {
-            _output.Text = "Could not run solution: " + exception.Message;
-            _status.Text = "Run failed";
+            _output.Text = exception.Message;
+            _status.Text = "Neo++ compile/runtime error";
         }
         finally
         {
@@ -512,24 +602,115 @@ public partial class Form1 : Form
         }
     }
 
+    private static int PointsFor(Challenge challenge) => challenge.Difficulty switch
+    {
+        "Easy" => 100,
+        "Medium" => 250,
+        "Hard" => 500,
+        _ => 100
+    };
+
+    private void NewFile()
+    {
+        _currentFilePath = null;
+        _loadedChallengeId = null;
+        _editor.Clear();
+        _output.Clear();
+        _status.Text = "New Neo++ source file";
+    }
+
+    private void InspectBytecode()
+    {
+        try
+        {
+            _output.Text = new NeoRuntime().Disassemble(_editor.Text);
+            _status.Text = "Neo++ source compiled to NVM bytecode";
+        }
+        catch (NeoLanguageException exception)
+        {
+            _output.Text = exception.Message;
+            _status.Text = "Neo++ compile error";
+        }
+    }
+
     private void OpenCodeFile()
     {
-        using var dialog = new OpenFileDialog { Filter = "C# source (*.cs)|*.cs|All files (*.*)|*.*" };
+        using var dialog = new OpenFileDialog { Filter = "Neo++ source (*.neo)|*.neo|All files (*.*)|*.*", DefaultExt = "neo" };
         if (dialog.ShowDialog(this) == DialogResult.OK)
         {
             _editor.Text = File.ReadAllText(dialog.FileName);
+            _currentFilePath = dialog.FileName;
+            _loadedChallengeId = null;
             _status.Text = "Opened " + Path.GetFileName(dialog.FileName);
         }
     }
 
     private void SaveCodeFile()
     {
-        using var dialog = new SaveFileDialog { Filter = "C# source (*.cs)|*.cs", DefaultExt = "cs", FileName = "Solution.cs" };
+        using var dialog = new SaveFileDialog { Filter = "Neo++ source (*.neo)|*.neo", DefaultExt = "neo", FileName = "main.neo" };
         if (dialog.ShowDialog(this) == DialogResult.OK)
         {
             File.WriteAllText(dialog.FileName, _editor.Text);
+            _currentFilePath = dialog.FileName;
+            _loadedChallengeId = null;
             _status.Text = "Saved " + Path.GetFileName(dialog.FileName);
         }
+    }
+
+    private void ChooseJavaFile()
+    {
+        using var dialog = new OpenFileDialog { Filter = "Java source (*.java)|*.java|All files (*.*)|*.*" };
+        if (dialog.ShowDialog(this) == DialogResult.OK)
+        {
+            _javaSourcePath.Text = dialog.FileName;
+        }
+    }
+
+    private async Task RunJavaFileAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_javaSourcePath.Text))
+        {
+            _javaOutput.Text = "Choose a .java source file first.";
+            return;
+        }
+
+        _javaOutput.Text = "Starting Java source launcher…";
+        try
+        {
+            string sourcePath = _javaSourcePath.Text;
+            var result = await Task.Run(() => NeoJavaBridge.RunSource(sourcePath, [], Path.GetDirectoryName(sourcePath)!));
+            _javaOutput.Text = result.Output;
+            if (!string.IsNullOrWhiteSpace(result.Error)) _javaOutput.AppendText(Environment.NewLine + result.Error);
+            _status.Text = result.ExitCode == 0 ? "Java bridge completed" : $"Java exited with code {result.ExitCode}";
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception or IOException)
+        {
+            _javaOutput.Text = exception.Message;
+            _status.Text = "Java bridge unavailable";
+        }
+    }
+
+    private void RefreshRuntimeSummary()
+    {
+        string javaStatus;
+        try
+        {
+            var java = NeoJavaBridge.FindRuntime();
+            javaStatus = $"{java.Version}{Environment.NewLine}Executable: {java.Executable}";
+        }
+        catch (Exception exception) when (exception is System.ComponentModel.Win32Exception or InvalidOperationException or IOException)
+        {
+            javaStatus = "Not detected — install a JDK 11+ and set JAVA_HOME or add java to PATH.";
+        }
+
+        _runtimeSummary.Text =
+            $"NEO++ LANGUAGE   {NeoRuntime.Version}{Environment.NewLine}" +
+            $"NVM              Bytecode compiler + stack virtual machine{Environment.NewLine}" +
+            $"LANGUAGE FEATURES let / const, functions, recursion, arrays, switch, loops, break / continue{Environment.NewLine}" +
+            $"BUILT-INS        print, len(), contains(), java(){Environment.NewLine}" +
+            $"JAVA BRIDGE      {javaStatus}{Environment.NewLine}" +
+            $"HUB              Offline challenges: {_challenges.Count} | Profile: {_profile.DisplayName}{Environment.NewLine}" +
+            $"RUNTIME          .NET {Environment.Version} | {System.Runtime.InteropServices.RuntimeInformation.OSDescription}";
     }
 
     private static void StyleFilter(ComboBox combo)

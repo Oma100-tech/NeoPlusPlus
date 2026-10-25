@@ -1,0 +1,3 @@
+// Save this Neo++ script next to JavaBridgeDemo.java before running it.
+let result = java("JavaBridgeDemo.java");
+print "Java returned: " + result;

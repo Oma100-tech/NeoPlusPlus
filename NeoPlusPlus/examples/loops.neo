@@ -1,0 +1,13 @@
+let total = 0;
+
+for (let i = 1; i <= 10; i++) {
+    total += i;
+}
+
+print "Sum: " + total;
+
+let countdown = 3;
+while (countdown > 0) {
+    print countdown;
+    countdown--;
+}
